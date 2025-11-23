@@ -1,219 +1,84 @@
-// API Base URL
-const API_BASE = '';
+// app.js - Clinic Portal frontend
+// When deploying to Netlify, set the backend URL in Netlify UI as BACKEND_URL
+// If BACKEND_URL is not set, client will assume no backend (static-only).
 
-// Utility Functions
-function showMessage(elementId, message, type = 'success') {
+const BACKEND_URL = (function() {
+  // Netlify exposes env vars at build time. Replace this during build or set it in Netlify UI.
+  // If you built with a bundler, you could inject at build time; for plain static, edit this string.
+  return window.__BACKEND_URL__ || ""; // set this by editing index.html at deploy, or replace with actual URL
+})();
+
+const API_BASE = BACKEND_URL ? `${BACKEND_URL.replace(/\/$/, '')}/api` : '/api';
+
+function showMessage(elementId, message, type='success') {
     const element = document.getElementById(elementId);
+    if(!element) return;
     element.textContent = message;
     element.className = `message ${type}`;
     element.style.display = 'block';
-    
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-        element.style.display = 'none';
-    }, 5000);
+    setTimeout(()=>{ element.style.display='none'; }, 5000);
 }
 
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-// Patient Registration
-document.getElementById('registerForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const data = {
-        name: document.getElementById('patientName').value,
-        age: parseInt(document.getElementById('patientAge').value) || null,
-        gender: document.getElementById('patientGender').value,
-        phone: document.getElementById('patientPhone').value || null,
-        email: document.getElementById('patientEmail').value || null
-    };
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/register_patient`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showMessage('registerResult', `✓ Patient registered successfully! ID: ${result.patient_id}`, 'success');
-            document.getElementById('registerForm').reset();
-            loadPatients(); // Refresh patient list
-        } else {
-            showMessage('registerResult', `✗ Error: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        showMessage('registerResult', `✗ Network error: ${error.message}`, 'error');
-    }
-});
-
-// Appointment Scheduling
-document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const data = {
-        patient_id: parseInt(document.getElementById('apptPatientId').value),
-        doctor: document.getElementById('apptDoctor').value || null,
-        datetime: document.getElementById('apptDatetime').value,
-        notes: document.getElementById('apptNotes').value || null
-    };
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/schedule_appointment`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showMessage('apptResult', `✓ Appointment scheduled successfully! ID: ${result.appointment_id}`, 'success');
-            document.getElementById('appointmentForm').reset();
-            loadAppointments(); // Refresh appointments list
-        } else {
-            showMessage('apptResult', `✗ Error: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        showMessage('apptResult', `✗ Network error: ${error.message}`, 'error');
-    }
-});
-
-// Load Patients List
 async function loadPatients() {
-    const container = document.getElementById('patientsList');
-    container.innerHTML = '<div class="loading">Loading patients...</div>';
-    
+    if (!API_BASE || API_BASE === '/api') return; // no backend configured
     try {
-        const response = await fetch(`${API_BASE}/api/patients`);
-        const patients = await response.json();
-        
-        if (patients.length === 0) {
-            container.innerHTML = '<div class="empty-state">No patients registered yet</div>';
-            return;
+        const res = await fetch(`${API_BASE}/patients`);
+        const data = await res.json();
+        const list = document.getElementById('patientsList');
+        if (list) {
+            list.innerHTML = data.map(p => `<li>${p.id || p.patient_id || ''} — ${p.name || 'No name'}</li>`).join('');
         }
-        
-        container.innerHTML = patients.map(patient => `
-            <div class="data-item">
-                <div class="data-item-header">
-                    <span class="data-item-title">${patient.name}</span>
-                    <span class="data-item-id">ID: ${patient.id}</span>
-                </div>
-                <div class="data-item-details">
-                    <div><strong>Age:</strong> ${patient.age || 'N/A'} | <strong>Gender:</strong> ${patient.gender}</div>
-                    <div><strong>Phone:</strong> ${patient.phone || 'N/A'}</div>
-                    <div><strong>Email:</strong> ${patient.email || 'N/A'}</div>
-                </div>
-                <div class="data-item-meta">
-                    Registered: ${formatDate(patient.created_at)}
-                </div>
-            </div>
-        `).join('');
-    } catch (error) {
-        container.innerHTML = `<div class="error">Error loading patients: ${error.message}</div>`;
+    } catch (err) {
+        console.error('loadPatients error', err);
     }
 }
 
-// Load Appointments List
 async function loadAppointments() {
-    const container = document.getElementById('appointmentsList');
-    container.innerHTML = '<div class="loading">Loading appointments...</div>';
-    
+    if (!API_BASE || API_BASE === '/api') return;
     try {
-        const response = await fetch(`${API_BASE}/api/appointments`);
-        const appointments = await response.json();
-        
-        if (appointments.length === 0) {
-            container.innerHTML = '<div class="empty-state">No appointments scheduled yet</div>';
-            return;
+        const res = await fetch(`${API_BASE}/appointments`);
+        const data = await res.json();
+        const list = document.getElementById('appointmentsList');
+        if (list) {
+            list.innerHTML = data.map(a => `<li>${a.appointment_datetime} — ${a.doctor || ''}</li>`).join('');
         }
-        
-        container.innerHTML = appointments.map(appt => `
-            <div class="data-item">
-                <div class="data-item-header">
-                    <span class="data-item-title">${appt.patient_name || 'Unknown Patient'}</span>
-                    <span class="data-item-id">ID: ${appt.id}</span>
-                </div>
-                <div class="data-item-details">
-                    <div><strong>Doctor:</strong> ${appt.doctor || 'Not assigned'}</div>
-                    <div><strong>Date & Time:</strong> ${formatDate(appt.datetime)}</div>
-                    <div><strong>Patient ID:</strong> ${appt.patient_id} | <strong>Phone:</strong> ${appt.patient_phone || 'N/A'}</div>
-                    ${appt.notes ? `<div><strong>Notes:</strong> ${appt.notes}</div>` : ''}
-                    <div><strong>Status:</strong> <span style="text-transform: capitalize;">${appt.status}</span></div>
-                </div>
-                <div class="data-item-meta">
-                    Scheduled: ${formatDate(appt.created_at)}
-                </div>
-            </div>
-        `).join('');
-    } catch (error) {
-        container.innerHTML = `<div class="error">Error loading appointments: ${error.message}</div>`;
+    } catch (err) {
+        console.error('loadAppointments error', err);
     }
 }
 
-// Chat Functionality
-async function sendChatMessage() {
-    const patientId = document.getElementById('chatPatientId').value;
-    const message = document.getElementById('chatMessage').value;
-    
-    if (!message.trim()) {
-        showMessage('chatResult', '✗ Please enter a message', 'error');
+async function registerPatient() {
+    if (!API_BASE || API_BASE === '/api') {
+        showMessage('messageBox', 'No backend configured. Patient saved locally (demo).', 'error');
         return;
     }
-    
-    const data = {
-        patient_id: patientId ? parseInt(patientId) : null,
-        sender: 'patient',
-        message: message
-    };
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showMessage('chatResult', `✓ Message sent! Reply: "${result.reply}"`, 'success');
-            document.getElementById('chatMessage').value = '';
-        } else {
-            showMessage('chatResult', `✗ Error: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        showMessage('chatResult', `✗ Network error: ${error.message}`, 'error');
+    const name = document.getElementById('patientName').value;
+    const email = document.getElementById('patientEmail').value;
+    const phone = document.getElementById('patientPhone').value;
+    const res = await fetch(`${API_BASE}/register_patient`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, email, phone})
+    });
+    const data = await res.json();
+    if (res.ok) {
+        showMessage('messageBox', 'Patient registered successfully');
+        loadPatients();
+    } else {
+        showMessage('messageBox', data.error || 'Error registering patient', 'error');
     }
 }
 
-// Set default datetime to now
 function setDefaultDateTime() {
+    const el = document.getElementById('apptDatetime');
+    if (!el) return;
     const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    document.getElementById('apptDatetime').value = now.toISOString().slice(0, 16);
+    const iso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0,16);
+    el.value = iso;
 }
 
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadPatients();
     loadAppointments();
     setDefaultDateTime();
 });
-
-// Auto-refresh every 30 seconds
-setInterval(() => {
-    loadPatients();
-    loadAppointments();
-}, 30000);
