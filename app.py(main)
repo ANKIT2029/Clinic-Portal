@@ -1,0 +1,29 @@
+from flask import Flask
+from flask_cors import CORS
+from config import Config
+from routes import register_routes
+
+# Initialize Flask application
+app = Flask(
+    __name__, 
+    static_folder=Config.FRONTEND_FOLDER, 
+    static_url_path=""
+)
+
+# Enable CORS for all routes
+CORS(app)
+
+# Register all routes
+register_routes(app)
+
+if __name__ == "__main__":
+    print(f"🏥 Clinic Portal API starting...")
+    print(f"📍 Server: http://{Config.HOST}:{Config.PORT}")
+    print(f"🗄️  Database: {Config.DB_HOST}/{Config.DB_NAME}")
+    print(f"🤖 OpenAI: {'Enabled' if Config.OPENAI_API_KEY else 'Disabled (using rule-based responses)'}")
+    
+    app.run(
+        host=Config.HOST,
+        port=Config.PORT,
+        debug=Config.DEBUG
+    )
